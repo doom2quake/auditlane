@@ -1,0 +1,22 @@
+[project]
+name = "auditlane"
+version = "0.1.0"
+description = "AuditLane: a reproducible pre-audit cleanroom for the Arbitrum Audit Program. `auditlane build` folds an Arbitrum repo into a content-addressed manifest (pinned toolchain, captured test counts, per-contract source and Arbitrum Sepolia deployed-bytecode hashes), so a whitelisted audit firm opens a build that already works."
+requires-python = ">=3.10"
+dependencies = [
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+live = ["web3>=6.0.0"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+auditlane = "auditlane.main:cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["auditlane*", "agent_core*"]
