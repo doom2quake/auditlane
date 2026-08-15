@@ -1,0 +1,10 @@
+{
+  "suites": [
+    {
+      "suite": "forge test",
+      "passed": 13,
+      "failed": 0,
+      "command": "forge test"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "repo": "sample-vault",
+  "network": "arbitrum-sepolia",
+  "chain_id": 421614,
+  "contracts": {
+    "SampleVault": {
+      "source": "src/SampleVault.sol",
+      "address": "0x00000000000000000000000000000000000ca11e"
+    }
+  }
+}
