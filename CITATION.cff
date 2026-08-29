@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use AuditLane, please cite it as below."
+title: "AuditLane: A Reproducible Pre-Audit Cleanroom for the Arbitrum Audit Program"
+authors:
+  - family-names: Sarkar
+    given-names: Dipankar
+year: 2026
+license: MIT
+url: "https://github.com/doom2quake/auditlane"
+repository-code: "https://github.com/doom2quake/auditlane"
+abstract: >-
+  AuditLane is a reproducible pre-audit cleanroom for Arbitrum projects entering
+  the Arbitrum Audit Program. It folds a target repo into a single content-addressed
+  manifest: a pinned toolchain, captured test counts, and every contract's source
+  hash and Arbitrum Sepolia deployed-bytecode hash checked against the built
+  artifact. The manifest is a pure function of the repo state, so a reviewer re-runs
+  the same command and gets a byte-for-byte identical manifest id, and a deployed
+  bytecode that does not match the artifact fails the package closed with a fixed
+  reason code. The same seven reason codes and their order are recomputed on-chain in
+  BuildRegistry.sol, so a whitelisted audit firm never has to trust the tool's word
+  for the verdict. Milestone 1: the cleanroom core and the on-chain reference,
+  verified with pytest and forge. Arbitrum Sepolia testnet only.
