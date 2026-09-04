@@ -1,0 +1,188 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false
+}
+
+\title{AuditLane: A Reproducible Pre-Audit Cleanroom for the\\ Arbitrum Audit Program}
+\author{Dipankar Sarkar \\ \small doom2quake}
+\date{August 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A project that lands audit funding still hands the auditor a raw repository: a build that
+works on one machine and not another, a test suite that needs undocumented setup, and
+deployment scripts that point at stale addresses. Under a subsidised audit program the
+firm spends the first days of a fixed engagement reconstructing the build before a single
+line is reviewed, and that reconstruction is paid for out of a subsidy meant to buy
+review. We present AuditLane, a reproducible pre-audit cleanroom for the Arbitrum Audit
+Program~\cite{arbaudit}. AuditLane folds a target Arbitrum repository into a single
+content-addressed \emph{manifest}: a pinned toolchain, the captured test counts, and every
+contract's source hash and Arbitrum Sepolia deployed-bytecode hash checked against the
+locally built artifact. The fold is a pure function of the repository state, so a reviewer
+re-runs the documented command and obtains a byte-for-byte identical manifest id, and a
+deployed bytecode that does not match the built artifact fails the package closed with a
+fixed reason code. The same seven reason codes, in the same fixed order, are recomputed
+on-chain by a reference contract, so a whitelisted firm never has to trust the tool's word
+for the verdict. This paper describes the design and the milestone-1 implementation: a
+dependency-free Python core and a byte-for-byte Solidity reference, verified by 24 Python
+tests and 13 Solidity tests. All work is Arbitrum Sepolia testnet only; no mainnet, no
+deployment, no users, and no audit (Section~\ref{sec:limits}).
+\end{abstract}
+
+\section{Problem}
+An audit is only as deep as the time that survives the setup. When a whitelisted firm
+opens a repository cold, it reconstructs a build environment (which compiler version,
+which optimizer settings, which library commits), works out how to run the test suite,
+and reverse-engineers which on-chain address corresponds to which contract, all before
+review begins. Three failure shapes recur. First, the build is \emph{irreproducible}: an
+unpinned compiler range or an environment-dependent step means the artifact the firm
+builds is not the artifact that was deployed. Second, the evidence is \emph{asserted, not
+carried}: the team states that tests pass and that a deployed address holds a given
+contract, but nothing in the handoff lets the firm confirm either without redoing the
+work. Third, the review is \emph{not re-runnable}: after fixes, a re-audit starts the
+same archaeology over again, because the first pass captured nothing a machine can replay.
+
+The cost lands on the subsidy. The Arbitrum Audit Program~\cite{arbaudit} allocates
+\$10M in ARB over twelve months to compensate a fixed whitelist of firms for third-party
+smart-contract audits on Arbitrum~\cite{arbitrum}. Every hour a firm spends reconstructing
+a build is subsidy that bought no findings. The gap is narrow and concrete: there is no
+standard, reproducible, evidence-carrying package a project produces \emph{before} the firm
+starts, so the firm opens a build that already works, a test suite that already ran with
+its counts captured, and a verdict anyone can recompute.
+
+\section{Why Arbitrum}
+AuditLane is Arbitrum-specific by construction, and not because of a superficial
+integration. Its manifest is content-addressed, and the reproducibility verdict is a pure
+function whose seven reason codes and fixed evaluation order are mirrored byte-for-byte in
+a reference contract, \texttt{BuildRegistry.sol}. A project commits a manifest id on
+Arbitrum Sepolia; anyone recomputes the same id from the published package and checks the
+two agree, and the commitment is \emph{write-once} so a claim is immutable once made. The
+result is that ``this build reproduced, here is the verdict'' becomes a public, timestamped,
+on-chain claim on Arbitrum~\cite{arbdocs}, not a line in a report the reader is asked to
+believe. The timing is the program itself: the Audit Program is live, funded for a fixed
+window, and routing rolling engagements now, so a tool that reduces setup waste is worth
+most while the pipeline is running.
+
+\section{Design}
+AuditLane is one pure core, one on-chain reference, and one agent wrapper.
+
+\subsection{The manifest: a pure fold}
+The load-bearing component (\texttt{auditlane/manifest.py}) takes a repository spec ---
+the pinned toolchain, the source files committed by content hash, the captured test-suite
+result, and the on-chain deployments --- and folds it into a canonical payload over which
+a single content-addressed \texttt{manifest\_id} is taken. The fold performs no I/O, uses
+no clock, and touches no network: every value that varies is passed in, so the digest is a
+function of evidence alone~\cite{reproducible}. Sources and contracts are sorted by a
+stable key before hashing, so their order in the repository cannot change the id, and the
+canonical field order is fixed and mirrored in Solidity. Leaf content is committed as
+SHA-256~\cite{sha2} hashes, so the manifest never carries source bytes, only commitments
+to them. The consequence is the reproducibility property milestone 1 promises: two runs
+over the same repository state produce a byte-identical manifest and the same id, and a
+reviewer who clones the repository and re-runs the documented command reproduces the id
+and the test counts we publish.
+
+\subsection{The reproducibility check: fixed order, fail closed}
+A deterministic \texttt{check} returns the reason codes that apply, in a fixed order; an
+empty list is \texttt{REPRODUCIBLE}. The codes, in order, are: an unpinned toolchain
+(1), a build that captured no sources (2), a declared test suite that did not pass (3), a
+contract whose source is missing from the package (4), a deployed bytecode that does not
+match the built artifact (5), and a contract with no resolved on-chain deployment (6).
+The check is fail-closed: any unmet condition adds a code, and a green manifest carries
+none. Critically, the scanner does \emph{not} synthesise a passing test suite: the counts
+come from a captured \texttt{auditlane.tests.json} written after the suite ran, so the
+manifest reports the counts that actually ran.
+
+\subsection{The on-chain reference: \texttt{BuildRegistry.sol}}
+\texttt{BuildRegistry} recomputes the same verdict on-chain from a package's checkable
+shape, with the identical reason-code constants and the identical evaluation order, so the
+first-failing code returned on-chain matches the off-chain verdict. \texttt{manifestDigest}
+recomputes the id from the canonical payload with Keccak-256~\cite{keccak}, and
+\texttt{commit} writes a manifest id once, reverting on a re-commit, so a package's claim
+is a public, timestamped, immutable commitment. The two implementations share a common
+ABI: the same reason codes, the same order, the same canonical joining.
+
+\subsection{The Arbitrum chain seam}
+The on-chain claim AuditLane makes is: ``the contract deployed at this Arbitrum Sepolia
+address is the contract in this repository.'' To check that without trusting the tool, the
+manifest carries the hash of the deployed runtime bytecode next to the hash of the locally
+built artifact, and the check fails closed if they diverge. The seam
+(\texttt{auditlane/chain.py}) is one interface with two backends. Offline (the default,
+keyless) it returns the deployed bytecode hash from a deterministic in-process fixture,
+seeded from the sample's own artifact bytes so the honest case reproduces and a tampered
+artifact fails closed. Live (gated on \texttt{AUDITLANE\_RPC\_URL}) it calls
+\texttt{eth\_getCode} on Arbitrum Sepolia and refuses any chain id other than 421614. It
+is read-only either way and never needs a key.
+
+\subsection{The agent wrapper}
+The build runs as a recorded action wrapped in agent-core guardrails
+(\texttt{auditlane/agent.py}): the manifest write passes an \texttt{ActionLimiter}, so a
+runaway build loop is rate-limited like any other outbound action, and every step (scan,
+resolve, reproducibility check, manifest) is journalled in a \texttt{StateStore} so a UI
+can replay the activity log. The agent never emits a green manifest a failing check
+produced; that is the trust primitive.
+
+\section{Implementation and evaluation}
+The core is dependency-free Python: hashing, the canonical payload, and the check are a
+few hundred lines with no third-party runtime dependency, so ``offline mode'' can never
+degrade into an import error. The reference contract targets solc 0.8.24 and is
+self-contained. We evaluate by test, using Foundry~\cite{foundry} for the contract:
+
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{13 Solidity tests} (\texttt{forge test}, solc 0.8.24) on
+\texttt{BuildRegistry.sol}: every reason code, the fixed check order, the write-once
+commitment, and the Keccak digest.
+\item \textbf{24 Python tests} (\texttt{pytest}), keyless and offline: the reproducibility
+check for every code and its order, manifest determinism and content-addressing, the
+scanner reading a real fixture repository, and the agent recording a build with
+fail-closed guardrails.
+\end{itemize}
+
+The two suites are built to agree: the \texttt{test\_check\_*} cases are the exact
+analogues of the Solidity \texttt{test*Fails} cases, so a green \texttt{pytest} proves the
+off-chain core and the on-chain reference produce the same reason code, in the same order,
+for the same package. The sharpest case is the tampered deployment: a resolver returns the
+wrong deployed bytecode for the sample's address, and the build yields
+\texttt{NOT\_REPRODUCIBLE} with \texttt{BYTECODE\_MISMATCH} (code 5), off-chain and
+on-chain alike.
+
+\section{Limitations}\label{sec:limits}
+This is milestone 1, and the honest scope is narrow.
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{No mainnet}, and none planned under this grant. All Web3 targets are Arbitrum
+Sepolia testnet only; \texttt{BuildRegistry.sol} is not deployed anywhere yet (testnet
+deployment is milestone 2).
+\item \textbf{No live-chain test.} The live \texttt{eth\_getCode} path is wired and gated
+on \texttt{AUDITLANE\_RPC\_URL}, but the test suite runs the offline fixture, not a real
+Arbitrum endpoint.
+\item \textbf{No users, no revenue, no audit, no partnership with the Arbitrum Foundation.}
+Milestone 3 is a request to be audited through the Audit Program, not a claim that we have
+been. The substitute for traction is tested code and a candid scope map, not usage numbers.
+\end{itemize}
+
+\section{Conclusion}
+AuditLane makes the reproducibility of an Arbitrum project's build a checkable artifact
+rather than an assertion: a content-addressed manifest a whitelisted firm opens without
+reconstruction, a fail-closed verdict with a fixed reason-code order, and a byte-for-byte
+on-chain reference that turns the verdict into a public, recomputable commitment on
+Arbitrum. Milestone 1 delivers the cleanroom core and the reference contract, tested. The
+durable contribution is a standard, reproducible, evidence-carrying handoff format that
+makes every subsidised audit in the program start from a better place.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
