@@ -16,7 +16,7 @@ offline by default; the live Arbitrum Sepolia bytecode path gates on `AUDITLANE_
 cleanroom core plus a byte-for-byte on-chain reference (`BuildRegistry.sol`). Arbitrum
 Sepolia testnet only, never mainnet.
 
-**[▶ Live demo](https://doom2quake.github.io/auditlane/ui/)**  ·  **[Watch the walkthrough](https://youtu.be/ARBITRUMAUDIT_VIDEO)**  ·  **[Paper (PDF)](paper/paper.pdf)**  ·  **[Deck (PDF)](deck/deck.pdf)**  ·  Built for the **[Arbitrum Audit Program](https://arbitrum.foundation/)**
+**[▶ Live demo](https://doom2quake.github.io/auditlane/ui/)**  ·  **[Watch the walkthrough](https://youtu.be/U9ROK9goVF4)**  ·  **[Paper (PDF)](paper/paper.pdf)**  ·  **[Deck (PDF)](deck/deck.pdf)**  ·  Built for the **[Arbitrum Audit Program](https://arbitrum.foundation/)**
 
 Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md) first for the short version of what is
 proved, what is simulated, and what is not built. Nothing on this page contradicts it.
@@ -169,7 +169,7 @@ The full milestone-mapped write-up is in [docs/PROPOSAL.md](docs/PROPOSAL.md).
   invents no transaction hashes.
 - **Walkthrough video:** [`docs/auditlane-demo.mp4`](docs/auditlane-demo.mp4),
   a narrated tour of the problem, the reproducibility check, the architecture, and the
-  grant roadmap (also on [YouTube](https://youtu.be/ARBITRUMAUDIT_VIDEO)).
+  grant roadmap (also on [YouTube](https://youtu.be/U9ROK9goVF4)).
 
 [![AuditLane UI](docs/ui.png)](https://doom2quake.github.io/auditlane/ui/)
 
